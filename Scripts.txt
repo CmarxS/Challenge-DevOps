@@ -1,0 +1,140 @@
+az group create --name rg-challenge --location brazilsouth
+
+az vm create --resource-group rg-challenge --name vm-challenge --image almalinux:almalinux-x86_64:9-gen2:9.6.202505220 --size Standard_B1ms --vnet-name nnet-Linux --nsg nsgsr-linux --public-ip-address pip-ubuntu --authentication-type password --admin-username admlnx --admin-password "Fiap@2tdsvms"
+
+
+az vm open-port --resource-group rg-challenge --name vm-challenge --port 22
+
+az vm open-port --resource-group rg-challenge --name vm-challenge --port 8080 --priority 1010
+
+
+ssh admlnx@191.235.233.94
+Fiap@2tdsvms
+
+
+
+GIT
+===
+
+sudo yum install git -y
+
+git --version
+
+
+Docker
+======
+
+sudo yum install -y yum-utils -y
+
+sudo yum-config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+
+sudo yum install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+
+sudo systemctl start docker
+
+sudo usermod -aG docker admlnx
+
+newgrp docker
+
+docker run --rm hello-world
+
+------- Projeto Java
+
+sudo dnf install -y git maven java-21-openjdk-devel
+java -version
+sudo alternatives --config java
+sudo alternatives --config javac
+
+
+cd ~
+git clone https://github.com/CmarxS/Challenge-Java.git
+cd Challenge-Java
+
+------ Gerar o JAR executável com o Maven
+
+mvn clean package -DskipTests
+ls -l target/*.jar
+
+----- Criar o Dockerfile
+
+FROM maven:3.9.2-eclipse-temurin-21 AS build
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+COPY src ./src
+RUN mvn clean package -DskipTests -B
+
+FROM eclipse-temurin:21-jre
+RUN addgroup --system app && adduser --system --ingroup app app
+USER app
+WORKDIR /home/app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java","-jar","app.jar"]
+
+
+
+FROM openjdk:17-slim
+
+RUN addgroup --system app && adduser --system --ingroup app app
+USER app
+
+WORKDIR /home/app
+
+COPY target/*.jar app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
+
+
+-------- Build da imagem Docker
+
+docker build -t challenge-java:latest .
+
+
+docker rm -f challenge-api 2>/dev/null || true
+docker run -d --name challenge-api -p 8080:8080 challenge-java:latest
+----------  Executar o container em background
+
+docker run -d --name challenge-api -p 8080:8080 challenge-java:latest
+
+----- Verificar se o container subiu corretamente
+
+docker os
+
+--------- Testar o endpoint
+
+curl http://localhost:8080/   # ou o endpoint que sua API expõe, ex: /api/países
+
+CRUD: 
+INSERT INTO funcionarios (nome, cpf, cargo, data_admissao) VALUES
+('Ana Silva',   '12345678901', 'Analista',   '2023-01-15'),
+('Bruno Costa', '23456789012', 'Desenvolvedor', '2022-11-01'),
+('Carla Dias',  '34567890123', 'DBA',        '2023-03-10'),
+('Daniel Reis', '45678901234', 'Tester',     '2023-04-05'),
+('Elisa Maia',  '56789012345', 'DevOps',     '2022-12-20');
+
+# listar todos
+curl http://<IP_VM>:8080/api/funcionarios
+
+# buscar por id
+curl http://<IP_VM>:8080/api/funcionarios/1
+
+# criar
+curl -X POST http://<IP_VM>:8080/api/funcionarios \
+     -H "Content-Type: application/json" \
+     -d '{"nome":"Fábio","cpf":"67890123456","cargo":"Suporte","dataAdmissao":"2025-05-01"}'
+
+# atualizar
+curl -X PUT http://<IP_VM>:8080/api/funcionarios/1 \
+     -H "Content-Type: application/json" \
+     -d '{"nome":"Ana S.","cpf":"12345678901","cargo":"Lead","dataAdmissao":"2023-01-15"}'
+
+# deletar
+curl -X DELETE http://<IP_VM>:8080/api/funcionarios/5
+
+
+
+
+
